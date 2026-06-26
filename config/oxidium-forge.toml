@@ -1,0 +1,24 @@
+# Oxidium Forge — default configuration
+# All values shown are the built-in defaults.
+# Override specific fields; unset keys fall back to defaults.
+# Environment variables (FORGE_*) always take precedence.
+
+# Path to the SQLite database file.
+# Defaults to the platform data directory (e.g. ~/.local/share/oxidium/forge/forge.db).
+# db_path = "/path/to/forge.db"
+
+# HTTP interface the daemon binds to.
+host = "127.0.0.1"
+port = 7890
+
+# SQLite busy-wait timeout in milliseconds.
+busy_timeout_ms = 5000
+
+# Log level: trace | debug | info | warn | error
+log_level = "info"
+
+# Max SQLite pool connections (SQLite is single-writer; keep this low).
+max_connections = 5
+
+# How long (seconds) to wait for a daemon to acquire its lock before giving up.
+lock_timeout_secs = 30

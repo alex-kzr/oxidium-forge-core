@@ -1,0 +1,19 @@
+[package]
+name = "forge-api"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+forge-model = { path = "../forge-model" }
+forge-store = { path = "../forge-store" }
+forge-engine = { path = "../forge-engine" }
+axum = { workspace = true, features = ["multipart"] }
+tower-http = { workspace = true }
+tokio = { workspace = true }
+sqlx = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+time = { workspace = true }
