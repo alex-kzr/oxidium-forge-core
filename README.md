@@ -51,3 +51,7 @@ All cross-cutting documentation lives in the umbrella repo:
 | [Data Model](https://github.com/alex-kzr/oxidium-forge/blob/main/docs/data-model/entities.md) | Database entities and schema |
 | [ADRs](https://github.com/alex-kzr/oxidium-forge/blob/main/docs/decisions/adr-index.md) | Architecture Decision Records |
 | [BPMN Support Matrix](https://github.com/alex-kzr/oxidium-forge/blob/main/docs/bpmn-elements/README.md) | Supported BPMN elements |
+
+## License
+
+This project is licensed under the MIT License. See [LICENSE.md](./LICENSE.md)
