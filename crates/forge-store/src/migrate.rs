@@ -7,6 +7,9 @@ use std::collections::BTreeMap;
 const MIGRATIONS: &[(i64, &str, &str)] = &[
     (1, "system", include_str!("../../../migrations/0001_system.sql")),
     (2, "process_definitions", include_str!("../../../migrations/0002_process_definitions.sql")),
+    (3, "runtime_core", include_str!("../../../migrations/0003_runtime_core.sql")),
+    (4, "variables", include_str!("../../../migrations/0004_variables.sql")),
+    (5, "process_events", include_str!("../../../migrations/0005_process_events.sql")),
 ];
 
 pub async fn run_migrations(pool: &SqlitePool) -> Result<(), StoreError> {
@@ -114,6 +117,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(count, MIGRATIONS.len() as i64);
+        assert_eq!(count, 5);
 
         store.close().await;
     }

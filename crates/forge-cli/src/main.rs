@@ -59,6 +59,11 @@ enum Commands {
         #[command(subcommand)]
         action: DefinitionsAction,
     },
+    /// Manage process instances
+    Instance {
+        #[command(subcommand)]
+        action: InstanceAction,
+    },
 }
 
 #[derive(Subcommand)]
@@ -68,6 +73,26 @@ enum DefinitionsAction {
     /// Activate a specific definition version
     Activate {
         /// Definition key
+        key: i64,
+    },
+}
+
+#[derive(Subcommand)]
+enum InstanceAction {
+    /// Start a new process instance
+    Start {
+        /// BPMN process id
+        bpmn_process_id: String,
+        /// Set a variable in key=value form (value parsed as JSON, fallback to string)
+        #[arg(long = "var", value_name = "KEY=VALUE")]
+        vars: Vec<String>,
+        /// Load initial variables from a JSON file
+        #[arg(long)]
+        variables: Option<PathBuf>,
+    },
+    /// Show the status of a process instance
+    Status {
+        /// Instance key
         key: i64,
     },
 }
@@ -119,7 +144,6 @@ async fn main() -> Result<()> {
                 commands::daemon::start(&client, &config).await?;
             }
             DaemonAction::Stop => {
-                // stop does NOT call ensure_daemon_running
                 commands::daemon::stop(&config).await?;
             }
             DaemonAction::Status => {
@@ -155,6 +179,39 @@ async fn main() -> Result<()> {
                 DefinitionsAction::List => commands::definitions::list(&client, cli.json).await?,
                 DefinitionsAction::Activate { key } => {
                     commands::definitions::activate(&client, key, cli.json).await?
+                }
+            }
+        }
+        Commands::Instance { action } => {
+            ensure::ensure_daemon_running(
+                &client,
+                cli.config.as_deref().map(|p| p.to_str().unwrap_or("")),
+            )
+            .await?;
+            match action {
+                InstanceAction::Start {
+                    bpmn_process_id,
+                    vars,
+                    variables,
+                } => {
+                    let kv_pairs: Vec<(String, String)> = vars
+                        .into_iter()
+                        .map(|s| {
+                            let (k, v) = s.split_once('=').unwrap_or((&s, "null"));
+                            (k.to_string(), v.to_string())
+                        })
+                        .collect();
+                    commands::instance::start(
+                        &client,
+                        &bpmn_process_id,
+                        &kv_pairs,
+                        variables.as_deref(),
+                        cli.json,
+                    )
+                    .await?;
+                }
+                InstanceAction::Status { key } => {
+                    commands::instance::status(&client, key, cli.json).await?;
                 }
             }
         }

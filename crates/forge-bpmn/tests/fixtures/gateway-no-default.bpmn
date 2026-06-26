@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions
+  xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+  xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
+  id="Definitions_gnd"
+  targetNamespace="http://bpmn.io/schema/bpmn"
+  exporter="Camunda Modeler"
+  exporterVersion="5.48.0">
+  <bpmn:process id="gateway-no-default" name="Gateway No Default" isExecutable="true">
+    <bpmn:startEvent id="Start_1" name="Start">
+      <bpmn:outgoing>Flow_start_to_gw</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:exclusiveGateway id="Gateway_1" name="Amount?">
+      <bpmn:incoming>Flow_start_to_gw</bpmn:incoming>
+      <bpmn:outgoing>Flow_to_high</bpmn:outgoing>
+      <bpmn:outgoing>Flow_to_low</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="End_high" name="High End">
+      <bpmn:incoming>Flow_to_high</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="End_low" name="Low End">
+      <bpmn:incoming>Flow_to_low</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_start_to_gw" sourceRef="Start_1" targetRef="Gateway_1" />
+    <bpmn:sequenceFlow id="Flow_to_high" sourceRef="Gateway_1" targetRef="End_high">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">=amount &gt; 100</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_to_low" sourceRef="Gateway_1" targetRef="End_low">
+      <bpmn:conditionExpression xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="bpmn:tFormalExpression">=amount &lt;= 100</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+  </bpmn:process>
+</bpmn:definitions>
