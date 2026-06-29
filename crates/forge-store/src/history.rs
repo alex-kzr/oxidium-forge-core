@@ -1,4 +1,4 @@
-use crate::{incidents, jobs};
+use crate::{incidents, jobs, manual_tasks};
 use forge_model::StoreError;
 use sqlx::SqliteConnection;
 
@@ -72,6 +72,9 @@ pub async fn archive_instance(
 
     // Incidents → history
     incidents::archive_incidents_for_instance(conn, instance_key).await?;
+
+    // Manual tasks → history
+    manual_tasks::archive_manual_tasks_for_instance(conn, instance_key).await?;
 
     // Instance → history (last, after FKs are resolved by deleting children first)
     sqlx::query(

@@ -71,6 +71,12 @@ enum Commands {
         #[command(subcommand)]
         action: IncidentsAction,
     },
+    /// Manage manual tasks
+    #[command(name = "manual-task")]
+    ManualTask {
+        #[command(subcommand)]
+        action: ManualTaskAction,
+    },
 }
 
 #[derive(Subcommand)]
@@ -144,6 +150,31 @@ enum IncidentsAction {
     },
     Resolve {
         key: i64,
+    },
+}
+
+#[derive(Subcommand)]
+enum ManualTaskAction {
+    /// List manual tasks
+    List {
+        #[arg(long)]
+        state: Option<String>,
+        #[arg(long)]
+        instance: Option<i64>,
+    },
+    /// Complete a manual task
+    Complete {
+        key: i64,
+        #[arg(long = "var", value_name = "KEY=VALUE")]
+        vars: Vec<String>,
+        #[arg(long)]
+        variables: Option<PathBuf>,
+    },
+    /// Cancel a manual task
+    Cancel {
+        key: i64,
+        #[arg(long)]
+        reason: Option<String>,
     },
 }
 
@@ -276,6 +307,40 @@ async fn main() -> Result<()> {
                 }
                 IncidentsAction::Resolve { key } => {
                     commands::incidents::resolve(&client, key, cli.json).await?;
+                }
+            }
+        }
+        Commands::ManualTask { action } => {
+            ensure(cli.config.as_deref().map(|p| p.to_str().unwrap_or(""))).await?;
+            match action {
+                ManualTaskAction::List { state, instance } => {
+                    commands::manual_task::list(&client, state.as_deref(), instance, cli.json)
+                        .await?;
+                }
+                ManualTaskAction::Complete {
+                    key,
+                    vars,
+                    variables,
+                } => {
+                    let kv_pairs: Vec<(String, String)> = vars
+                        .into_iter()
+                        .map(|s| {
+                            let (k, v) = s.split_once('=').unwrap_or((&s, "null"));
+                            (k.to_string(), v.to_string())
+                        })
+                        .collect();
+                    commands::manual_task::complete(
+                        &client,
+                        key,
+                        &kv_pairs,
+                        variables.as_deref(),
+                        cli.json,
+                    )
+                    .await?;
+                }
+                ManualTaskAction::Cancel { key, reason } => {
+                    commands::manual_task::cancel(&client, key, reason.as_deref(), cli.json)
+                        .await?;
                 }
             }
         }

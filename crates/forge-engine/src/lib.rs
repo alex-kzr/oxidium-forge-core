@@ -6,6 +6,7 @@ pub mod handlers;
 pub mod incidents;
 pub mod instance;
 pub mod jobs;
+pub mod manual_tasks;
 pub mod mapping;
 
 pub use deployment::{deploy, DeployDiagnostic, DeployError, DeployedDefinition};

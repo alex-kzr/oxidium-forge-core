@@ -4,7 +4,7 @@ use axum::{
 };
 use tower_http::trace::TraceLayer;
 
-use crate::{definitions, deployments, health, incidents, instances, jobs, state::AppState};
+use crate::{definitions, deployments, health, incidents, instances, jobs, manual_tasks, state::AppState};
 
 pub fn create_router(state: AppState) -> Router {
     Router::new()
@@ -45,6 +45,16 @@ pub fn create_router(state: AppState) -> Router {
         .route(
             "/api/v1/incidents/:key/resolution",
             post(incidents::resolve_incident),
+        )
+        // Manual tasks (MT-05)
+        .route("/api/v1/manual-tasks", get(manual_tasks::list_manual_tasks))
+        .route(
+            "/api/v1/manual-tasks/:key/completion",
+            post(manual_tasks::complete_manual_task),
+        )
+        .route(
+            "/api/v1/manual-tasks/:key/cancellation",
+            post(manual_tasks::cancel_manual_task),
         )
         .layer(TraceLayer::new_for_http())
         .with_state(state)
