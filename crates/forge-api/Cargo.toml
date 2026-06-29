@@ -3,6 +3,9 @@ name = "forge-api"
 version = "0.1.0"
 edition = "2021"
 
+[dev-dependencies]
+tempfile = "3"
+
 [dependencies]
 forge-model = { path = "../forge-model" }
 forge-store = { path = "../forge-store" }

@@ -43,14 +43,11 @@ enum Commands {
     Health,
     /// Validate a BPMN file without deploying
     Validate {
-        /// Path to .bpmn file
         file: std::path::PathBuf,
     },
     /// Deploy a BPMN file
     Deploy {
-        /// Path to .bpmn file
         file: std::path::PathBuf,
-        /// Automatically activate after deploy
         #[arg(long, default_value_t = true)]
         activate: bool,
     },
@@ -64,56 +61,96 @@ enum Commands {
         #[command(subcommand)]
         action: InstanceAction,
     },
-}
-
-#[derive(Subcommand)]
-enum DefinitionsAction {
-    /// List all process definitions
-    List,
-    /// Activate a specific definition version
-    Activate {
-        /// Definition key
-        key: i64,
+    /// Manage jobs (worker contract)
+    Jobs {
+        #[command(subcommand)]
+        action: JobsAction,
     },
-}
-
-#[derive(Subcommand)]
-enum InstanceAction {
-    /// Start a new process instance
-    Start {
-        /// BPMN process id
-        bpmn_process_id: String,
-        /// Set a variable in key=value form (value parsed as JSON, fallback to string)
-        #[arg(long = "var", value_name = "KEY=VALUE")]
-        vars: Vec<String>,
-        /// Load initial variables from a JSON file
-        #[arg(long)]
-        variables: Option<PathBuf>,
-    },
-    /// Show the status of a process instance
-    Status {
-        /// Instance key
-        key: i64,
+    /// Manage incidents
+    Incidents {
+        #[command(subcommand)]
+        action: IncidentsAction,
     },
 }
 
 #[derive(Subcommand)]
 enum DaemonAction {
-    /// Start the daemon (idempotent)
     Start,
-    /// Stop a running daemon
     Stop,
-    /// Show daemon status
     Status,
-    /// Restart the daemon (stop then start)
     Restart,
+}
+
+#[derive(Subcommand)]
+enum DefinitionsAction {
+    List,
+    Activate { key: i64 },
+}
+
+#[derive(Subcommand)]
+enum InstanceAction {
+    Start {
+        bpmn_process_id: String,
+        #[arg(long = "var", value_name = "KEY=VALUE")]
+        vars: Vec<String>,
+        #[arg(long)]
+        variables: Option<PathBuf>,
+    },
+    Status {
+        key: i64,
+    },
+}
+
+#[derive(Subcommand)]
+enum JobsAction {
+    /// Fetch and lock jobs by task type
+    Activate {
+        #[arg(long = "type", value_name = "TASK_TYPE")]
+        task_type: String,
+        #[arg(long, default_value = "cli-worker")]
+        worker: String,
+        #[arg(long, default_value_t = 1)]
+        max: i64,
+        /// Lock duration in seconds
+        #[arg(long, default_value_t = 60)]
+        lock: i64,
+    },
+    /// Complete an activated job
+    Complete {
+        key: i64,
+        #[arg(long = "var", value_name = "KEY=VALUE")]
+        vars: Vec<String>,
+        #[arg(long)]
+        variables: Option<PathBuf>,
+    },
+    /// Report a job failure
+    Fail {
+        key: i64,
+        #[arg(long)]
+        error: String,
+        #[arg(long, default_value_t = 0)]
+        retries: i64,
+        /// Retry backoff in seconds
+        #[arg(long)]
+        backoff: Option<i64>,
+    },
+}
+
+#[derive(Subcommand)]
+enum IncidentsAction {
+    List {
+        #[arg(long)]
+        state: Option<String>,
+    },
+    Resolve {
+        key: i64,
+    },
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    // Initialize minimal logging
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_env("FORGE_LOG")
@@ -122,7 +159,6 @@ async fn main() -> Result<()> {
         .try_init()
         .ok();
 
-    // Build config (load from file/env, then override with CLI flags)
     let mut config = Config::load().unwrap_or_else(|_| Config::default());
     config.host = cli.host.clone();
     config.port = cli.port;
@@ -130,51 +166,35 @@ async fn main() -> Result<()> {
     let base_url = format!("http://{}:{}", cli.host, cli.port);
     let client = RestClient::new(&base_url);
 
+    let ensure = |p: Option<&str>| {
+        let client = client.clone();
+        let p = p.map(|s| s.to_string());
+        async move {
+            ensure::ensure_daemon_running(&client, p.as_deref()).await
+        }
+    };
+
     match cli.command {
         Commands::Health => {
-            ensure::ensure_daemon_running(
-                &client,
-                cli.config.as_deref().map(|p| p.to_str().unwrap_or("")),
-            )
-            .await?;
+            ensure(cli.config.as_deref().map(|p| p.to_str().unwrap_or(""))).await?;
             commands::health::run(&client, cli.json).await?;
         }
         Commands::Daemon { action } => match action {
-            DaemonAction::Start => {
-                commands::daemon::start(&client, &config).await?;
-            }
-            DaemonAction::Stop => {
-                commands::daemon::stop(&config).await?;
-            }
-            DaemonAction::Status => {
-                commands::daemon::status(&client, &config, cli.json).await?;
-            }
-            DaemonAction::Restart => {
-                commands::daemon::restart(&client, &config).await?;
-            }
+            DaemonAction::Start => commands::daemon::start(&client, &config).await?,
+            DaemonAction::Stop => commands::daemon::stop(&config).await?,
+            DaemonAction::Status => commands::daemon::status(&client, &config, cli.json).await?,
+            DaemonAction::Restart => commands::daemon::restart(&client, &config).await?,
         },
         Commands::Validate { file } => {
-            ensure::ensure_daemon_running(
-                &client,
-                cli.config.as_deref().map(|p| p.to_str().unwrap_or("")),
-            )
-            .await?;
+            ensure(cli.config.as_deref().map(|p| p.to_str().unwrap_or(""))).await?;
             commands::deploy::validate_bpmn(&client, &file, cli.json).await?;
         }
         Commands::Deploy { file, activate } => {
-            ensure::ensure_daemon_running(
-                &client,
-                cli.config.as_deref().map(|p| p.to_str().unwrap_or("")),
-            )
-            .await?;
+            ensure(cli.config.as_deref().map(|p| p.to_str().unwrap_or(""))).await?;
             commands::deploy::deploy_bpmn(&client, &file, activate, cli.json).await?;
         }
         Commands::Definitions { action } => {
-            ensure::ensure_daemon_running(
-                &client,
-                cli.config.as_deref().map(|p| p.to_str().unwrap_or("")),
-            )
-            .await?;
+            ensure(cli.config.as_deref().map(|p| p.to_str().unwrap_or(""))).await?;
             match action {
                 DefinitionsAction::List => commands::definitions::list(&client, cli.json).await?,
                 DefinitionsAction::Activate { key } => {
@@ -183,11 +203,7 @@ async fn main() -> Result<()> {
             }
         }
         Commands::Instance { action } => {
-            ensure::ensure_daemon_running(
-                &client,
-                cli.config.as_deref().map(|p| p.to_str().unwrap_or("")),
-            )
-            .await?;
+            ensure(cli.config.as_deref().map(|p| p.to_str().unwrap_or(""))).await?;
             match action {
                 InstanceAction::Start {
                     bpmn_process_id,
@@ -212,6 +228,54 @@ async fn main() -> Result<()> {
                 }
                 InstanceAction::Status { key } => {
                     commands::instance::status(&client, key, cli.json).await?;
+                }
+            }
+        }
+        Commands::Jobs { action } => {
+            ensure(cli.config.as_deref().map(|p| p.to_str().unwrap_or(""))).await?;
+            match action {
+                JobsAction::Activate {
+                    task_type,
+                    worker,
+                    max,
+                    lock,
+                } => {
+                    commands::jobs::activate(&client, &task_type, &worker, max, lock, cli.json)
+                        .await?;
+                }
+                JobsAction::Complete {
+                    key,
+                    vars,
+                    variables,
+                } => {
+                    let kv_pairs: Vec<(String, String)> = vars
+                        .into_iter()
+                        .map(|s| {
+                            let (k, v) = s.split_once('=').unwrap_or((&s, "null"));
+                            (k.to_string(), v.to_string())
+                        })
+                        .collect();
+                    commands::jobs::complete(&client, key, &kv_pairs, variables.as_deref(), cli.json)
+                        .await?;
+                }
+                JobsAction::Fail {
+                    key,
+                    error,
+                    retries,
+                    backoff,
+                } => {
+                    commands::jobs::fail(&client, key, &error, retries, backoff, cli.json).await?;
+                }
+            }
+        }
+        Commands::Incidents { action } => {
+            ensure(cli.config.as_deref().map(|p| p.to_str().unwrap_or(""))).await?;
+            match action {
+                IncidentsAction::List { state } => {
+                    commands::incidents::list(&client, state.as_deref(), cli.json).await?;
+                }
+                IncidentsAction::Resolve { key } => {
+                    commands::incidents::resolve(&client, key, cli.json).await?;
                 }
             }
         }

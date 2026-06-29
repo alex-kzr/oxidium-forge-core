@@ -10,6 +10,7 @@ const MIGRATIONS: &[(i64, &str, &str)] = &[
     (3, "runtime_core", include_str!("../../../migrations/0003_runtime_core.sql")),
     (4, "variables", include_str!("../../../migrations/0004_variables.sql")),
     (5, "process_events", include_str!("../../../migrations/0005_process_events.sql")),
+    (6, "jobs_incidents", include_str!("../../../migrations/0006_jobs_incidents.sql")),
 ];
 
 pub async fn run_migrations(pool: &SqlitePool) -> Result<(), StoreError> {
@@ -117,7 +118,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(count, MIGRATIONS.len() as i64);
-        assert_eq!(count, 5);
+        assert_eq!(count, 6);
 
         store.close().await;
     }

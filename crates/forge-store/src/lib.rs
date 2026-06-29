@@ -1,6 +1,8 @@
 pub mod definitions;
 pub mod events;
 pub mod history;
+pub mod incidents;
+pub mod jobs;
 pub mod migrate;
 pub mod pool;
 pub mod runtime;
